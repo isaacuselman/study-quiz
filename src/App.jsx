@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DIM, wrap } from "./styles/theme";
-import { lectures, LECTURE_REGISTRY } from "./data/questions";
+import { lectures, LECTURE_REGISTRY, questionById, resolveVariant } from "./data/questions";
 import useQuizData from "./hooks/useQuizData";
 import { calculateSM2, isGraduated, newReviewItem } from "./utils/sm2";
 import { shuffleArray, shuffleQuestionOptions } from "./utils/shuffle";
@@ -20,6 +20,14 @@ export default function App() {
   const [lastNewMisses, setLastNewMisses] = useState(0);
   const [isReviewQuiz, setIsReviewQuiz] = useState(false);
 
+  // Resolve variant based on how many times the student has seen this question
+  const prepareQuestion = (q) => {
+    const id = q.id;
+    const history = questionHistory[id];
+    const timesSeen = history ? history.timesSeen : 0;
+    return resolveVariant(q, timesSeen);
+  };
+
   const handlePickLecture = (name) => {
     const allMatch = name.match(/^__all_(.+)__$/);
     let qs;
@@ -31,7 +39,7 @@ export default function App() {
     } else {
       qs = lectures[name].map(q => ({ ...q, source: name }));
     }
-    qs = shuffleArray(qs).map(shuffleQuestionOptions);
+    qs = shuffleArray(qs).map(q => shuffleQuestionOptions(prepareQuestion(q)));
     setQuizQs(qs);
     setIsReviewQuiz(false);
     setView("quiz");
@@ -42,14 +50,15 @@ export default function App() {
 
     const now = Date.now();
     const today = new Date().toISOString().slice(0, 10);
-    const missedSet = new Set(misses.map(m => m.q));
+    const missedSet = new Set(misses.map(m => m.id));
 
-    // Update question history for all questions in this quiz
+    // Update question history — keyed by id
     const newHistory = { ...questionHistory };
     for (const q of quizQs) {
-      const wasCorrect = !missedSet.has(q.q);
-      const existing = newHistory[q.q] || { timesSeen: 0, timesCorrect: 0, lastSeenAt: 0, source: q.source };
-      newHistory[q.q] = {
+      const key = q.id;
+      const wasCorrect = !missedSet.has(key);
+      const existing = newHistory[key] || { timesSeen: 0, timesCorrect: 0, lastSeenAt: 0, source: q.source };
+      newHistory[key] = {
         ...existing,
         timesSeen: existing.timesSeen + 1,
         timesCorrect: existing.timesCorrect + (wasCorrect ? 1 : 0),
@@ -61,18 +70,18 @@ export default function App() {
     // Update quiz dates for streak
     const newDates = quizDates.includes(today) ? quizDates : [...quizDates, today];
 
-    // Update review items with SM-2
+    // Update review items with SM-2 — keyed by id
     let newReviewItems = [...reviewItems];
     const reviewMap = new Map(newReviewItems.map((r, i) => [r.questionId, i]));
 
     if (isReviewQuiz) {
       for (const q of quizQs) {
-        const idx = reviewMap.get(q.q);
+        const idx = reviewMap.get(q.id);
         if (idx === undefined) continue;
         const item = newReviewItems[idx];
-        const quality = missedSet.has(q.q) ? 0 : 4;
+        const quality = missedSet.has(q.id) ? 0 : 4;
         const updated = calculateSM2(item, quality);
-        const miss = misses.find(m => m.q === q.q);
+        const miss = misses.find(m => m.id === q.id);
         newReviewItems[idx] = {
           ...item,
           ...updated,
@@ -85,9 +94,9 @@ export default function App() {
     } else {
       // Normal quiz: correct answers that are in review get SM-2 update, misses get added/reset
       for (const q of quizQs) {
-        const idx = reviewMap.get(q.q);
-        if (missedSet.has(q.q)) {
-          const miss = misses.find(m => m.q === q.q);
+        const idx = reviewMap.get(q.id);
+        if (missedSet.has(q.id)) {
+          const miss = misses.find(m => m.id === q.id);
           const yourAnswer = miss._indexMap ? miss._indexMap[miss.yourAnswer] : miss.yourAnswer;
           if (idx !== undefined) {
             // Reset existing review item
@@ -114,8 +123,8 @@ export default function App() {
   };
 
   const handleFlag = (question) => {
-    // Add to review queue without marking incorrect
-    const existing = reviewItems.find(r => r.questionId === question.q);
+    // Add to review queue without marking incorrect — keyed by id
+    const existing = reviewItems.find(r => r.questionId === question.id);
     if (existing) return; // already in review
     const item = newReviewItem(question, question.source, null);
     item.flagged = true;
@@ -123,12 +132,11 @@ export default function App() {
   };
 
   const startReviewQuiz = (items, label) => {
-    // Build quiz questions from review items, looking up full question data
-    const allQs = Object.entries(lectures).flatMap(([src, arr]) => arr.map(q => ({ ...q, source: src })));
-    const qMap = new Map(allQs.map(q => [q.q, q]));
+    // Build quiz questions from review items, looking up by id
     const qs = items
-      .map(item => qMap.get(item.questionId))
-      .filter(Boolean);
+      .map(item => questionById.get(item.questionId))
+      .filter(Boolean)
+      .map(q => prepareQuestion(q));
     setQuizQs(shuffleArray(qs).map(shuffleQuestionOptions));
     setReviewLbl(label);
     setIsReviewQuiz(true);

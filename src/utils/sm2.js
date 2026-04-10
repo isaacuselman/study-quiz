@@ -29,7 +29,7 @@ export function isGraduated(item, thresholdDays = 60) {
 
 export function newReviewItem(question, source, yourAnswer) {
   return {
-    questionId: question.q,
+    questionId: question.id,
     source,
     yourAnswer,
     easeFactor: 2.5,

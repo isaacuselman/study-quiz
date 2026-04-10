@@ -7,8 +7,9 @@ export function computeLectureStats(questions, questionHistory, reviewItems) {
   const reviewMap = new Map(reviewItems.map(r => [r.questionId, r]));
 
   for (const q of questions) {
-    const history = questionHistory[q.q];
-    const review = reviewMap.get(q.q);
+    const key = q.id || q.q;
+    const history = questionHistory[key];
+    const review = reviewMap.get(key);
 
     if (!history || history.timesSeen === 0) {
       unseen++;

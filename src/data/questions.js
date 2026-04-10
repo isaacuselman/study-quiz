@@ -24,3 +24,22 @@ export const lecturesByCourse = Object.groupBy(LECTURE_REGISTRY, l => l.course);
 export const lectures = Object.fromEntries(
   LECTURE_REGISTRY.map(l => [l.title, l.questions])
 );
+
+// Flat map: id → question (for review item lookups)
+export const questionById = new Map(
+  LECTURE_REGISTRY.flatMap(l =>
+    l.questions.map(q => [q.id, { ...q, source: l.title }])
+  )
+);
+
+// Resolve which variant to show based on times seen
+export function resolveVariant(question, timesSeen = 0) {
+  const variants = question.variants;
+  if (!variants || variants.length === 0) return question;
+  // Variant 0 = base question, variants 1..N = alternatives
+  const totalVariants = 1 + variants.length;
+  const idx = timesSeen % totalVariants;
+  if (idx === 0) return question;
+  const v = variants[idx - 1];
+  return { ...question, q: v.q, options: v.options, answer: v.answer };
+}

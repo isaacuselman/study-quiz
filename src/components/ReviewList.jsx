@@ -1,15 +1,11 @@
 import { DIM, GREEN, RED, YELLOW, ORANGE, CYAN, CARD, BORDER, btn, wrap } from "../styles/theme";
 import { isGraduated } from "../utils/sm2";
-import { lectures } from "../data/questions";
+import { questionById } from "../data/questions";
 
 export default function ReviewList({ reviewItems, onQuiz, onBack, onClear }) {
-  // Look up full question data for display
-  const allQs = Object.entries(lectures).flatMap(([src, arr]) => arr.map(q => ({ ...q, source: src })));
-  const qMap = new Map(allQs.map(q => [q.q, q]));
-
   const items = reviewItems.map(r => {
-    const full = qMap.get(r.questionId);
-    return { ...r, q: r.questionId, options: full?.options || [], answer: full?.answer ?? 0 };
+    const full = questionById.get(r.questionId);
+    return { ...r, q: full?.q || r.questionId, options: full?.options || [], answer: full?.answer ?? 0 };
   });
 
   const grouped = {};
@@ -62,7 +58,7 @@ export default function ReviewList({ reviewItems, onQuiz, onBack, onClear }) {
                   <p style={{ fontSize: 11, color: ORANGE, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, margin: 0 }}>
                     {src} &mdash; {grouped[src].length} item{grouped[src].length !== 1 ? "s" : ""}
                   </p>
-                  <button onClick={() => onQuiz(grouped[src].map(g => reviewItems.find(r => r.questionId === g.q)).filter(Boolean), `Review: ${src}`)} style={{ ...btn(ORANGE, true), fontSize: 11 }}>
+                  <button onClick={() => onQuiz(grouped[src].map(g => reviewItems.find(r => r.questionId === g.questionId)).filter(Boolean), `Review: ${src}`)} style={{ ...btn(ORANGE, true), fontSize: 11 }}>
                     Quiz these
                   </button>
                 </div>
@@ -71,7 +67,7 @@ export default function ReviewList({ reviewItems, onQuiz, onBack, onClear }) {
                   return (
                     <div key={i} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: 16, marginBottom: 8 }}>
                       <p style={{ color: "#fff", fontSize: 14, margin: "0 0 10px", lineHeight: 1.5 }}>{m.q}</p>
-                      <p style={{ color: RED, fontSize: 12, margin: "0 0 4px" }}>Your answer: {m.options[m.yourAnswer]}</p>
+                      {m.yourAnswer != null && <p style={{ color: RED, fontSize: 12, margin: "0 0 4px" }}>Your answer: {m.options[m.yourAnswer]}</p>}
                       <p style={{ color: GREEN, fontSize: 12, margin: "0 0 6px" }}>Correct: {m.options[m.answer]}</p>
                       <p style={{ color: rl.color, fontSize: 11, margin: 0, fontWeight: 600 }}>{rl.text}</p>
                     </div>
