@@ -34,9 +34,11 @@ Guidelines:
 - Avoid trivia (exact syntax minutiae, specific line numbers from examples)
 - Focus on "why" and "how" over "what" — test understanding, not memorization
 - All four options should be plausible; avoid obviously wrong distractors
+- **IMPORTANT: Keep all four options similar in length.** Do NOT make the correct answer consistently longer or more detailed than the distractors. If the correct answer needs to be a full sentence, make the wrong answers full sentences too. A test-taker should not be able to guess the answer by picking the longest option.
 - Add `explanation` for non-obvious answers to help learning
 - Group related questions with inline comments (e.g., `// Topic name`)
 - The `answer` field is a 0-based index into the `options` array
+- Vary which index (0-3) is correct — don't default to the same position
 
 After generating, paste the object into the appropriate course file in `src/data/`.
 

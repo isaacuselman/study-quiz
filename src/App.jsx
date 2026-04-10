@@ -113,6 +113,15 @@ export default function App() {
     setView("results");
   };
 
+  const handleFlag = (question) => {
+    // Add to review queue without marking incorrect
+    const existing = reviewItems.find(r => r.questionId === question.q);
+    if (existing) return; // already in review
+    const item = newReviewItem(question, question.source, null);
+    item.flagged = true;
+    persist({ reviewItems: [...reviewItems, item] });
+  };
+
   const startReviewQuiz = (items, label) => {
     // Build quiz questions from review items, looking up full question data
     const allQs = Object.entries(lectures).flatMap(([src, arr]) => arr.map(q => ({ ...q, source: src })));
@@ -180,7 +189,7 @@ export default function App() {
       <>
         <TopBar backTo={() => setView("pick")} {...topBarProps} />
         <div style={{ paddingTop: 48 }}>
-          <QuizEngine questions={quizQs} onFinish={handleFinish} label={null} />
+          <QuizEngine questions={quizQs} onFinish={handleFinish} onFlag={handleFlag} label={null} />
         </div>
       </>
     );

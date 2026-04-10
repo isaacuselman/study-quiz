@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { TEXT, DIM, GREEN, RED, YELLOW, ORANGE, CYAN, CARD, BORDER, btn, wrap } from "../styles/theme";
 
-export default function QuizEngine({ questions, onFinish, label }) {
+export default function QuizEngine({ questions, onFinish, onFlag, label }) {
   const [cur, setCur] = useState(0);
   const [sel, setSel] = useState(null);
   const [locked, setLocked] = useState(false);
   const [score, setScore] = useState(0);
   const [misses, setMisses] = useState([]);
+  const [flagged, setFlagged] = useState(false);
 
   const lock = () => {
     if (sel === null || locked) return;
@@ -16,7 +17,12 @@ export default function QuizEngine({ questions, onFinish, label }) {
   };
   const next = () => {
     if (cur + 1 >= questions.length) { onFinish(score, misses); return; }
-    setCur(c => c + 1); setSel(null); setLocked(false);
+    setCur(c => c + 1); setSel(null); setLocked(false); setFlagged(false);
+  };
+  const flagForReview = () => {
+    if (flagged) return;
+    setFlagged(true);
+    if (onFlag) onFlag(questions[cur]);
   };
 
   useEffect(() => {
@@ -25,6 +31,8 @@ export default function QuizEngine({ questions, onFinish, label }) {
       if (!locked && key >= "1" && key <= "4") {
         const idx = parseInt(key) - 1;
         if (idx < questions[cur].options.length) setSel(idx);
+      } else if (key === "f" && !locked && onFlag) {
+        flagForReview();
       } else if (key === " " || key === "Enter") {
         e.preventDefault();
         if (locked) next();
@@ -44,8 +52,8 @@ export default function QuizEngine({ questions, onFinish, label }) {
         <div style={{ display: "flex", gap: 3, marginBottom: 32 }}>
           {questions.map((_, i) => <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i < cur ? GREEN : i === cur ? YELLOW : "#2a2a35" }} />)}
         </div>
-        <p style={{ fontSize: 12, color: DIM, margin: "0 0 12px", letterSpacing: 1 }}>{cur + 1} / {questions.length}</p>
-        <h2 style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.6, margin: "0 0 28px", color: "#fff" }}>{q.q}</h2>
+        <p style={{ fontSize: 14, color: DIM, margin: "0 0 12px", letterSpacing: 1 }}>{cur + 1} / {questions.length}</p>
+        <h2 style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.6, margin: "0 0 28px", color: "#fff" }}>{q.q}</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {q.options.map((opt, i) => {
             let bg = CARD, border = `1px solid ${BORDER}`, tc = TEXT;
@@ -55,8 +63,8 @@ export default function QuizEngine({ questions, onFinish, label }) {
             } else if (i === sel) { border = `2px solid ${YELLOW}`; }
             return (
               <button key={i} onClick={() => !locked && setSel(i)} style={{
-                padding: "14px 16px", background: bg, border, borderRadius: 8, color: tc,
-                fontSize: 14, textAlign: "left", cursor: locked ? "default" : "pointer",
+                padding: "16px 18px", background: bg, border, borderRadius: 8, color: tc,
+                fontSize: 16, textAlign: "left", cursor: locked ? "default" : "pointer",
                 fontFamily: "inherit", lineHeight: 1.5, transition: "all 0.15s",
               }}>
                 <span style={{ color: DIM, marginRight: 12, fontWeight: 700 }}>{String.fromCharCode(65 + i)}</span>{opt}
@@ -70,9 +78,20 @@ export default function QuizEngine({ questions, onFinish, label }) {
             <p style={{ color: TEXT, fontSize: 13, lineHeight: 1.6, margin: 0 }}>{q.explanation}</p>
           </div>
         )}
-        {sel !== null && !locked && <button onClick={lock} style={{ marginTop: 24, ...btn(YELLOW) }}>Lock In</button>}
-        {locked && <button onClick={next} style={{ marginTop: 24, ...btn(YELLOW) }}>{cur + 1 >= questions.length ? "See Results" : "Next \u2192"}</button>}
-        <p style={{ fontSize: 10, color: "#555", marginTop: 16, margin: locked || sel !== null ? "8px 0 0" : "16px 0 0" }}>1-4 to select · space to confirm/advance</p>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 24 }}>
+          {sel !== null && !locked && <button onClick={lock} style={btn(YELLOW)}>Lock In</button>}
+          {locked && <button onClick={next} style={btn(YELLOW)}>{cur + 1 >= questions.length ? "See Results" : "Next \u2192"}</button>}
+          {!locked && onFlag && (
+            <button onClick={flagForReview} style={{
+              padding: "6px 16px", background: "transparent", border: `1px solid ${flagged ? ORANGE : BORDER}`,
+              borderRadius: 6, color: flagged ? ORANGE : DIM, fontSize: 12, cursor: flagged ? "default" : "pointer",
+              fontFamily: "inherit", fontWeight: 600, transition: "all 0.15s",
+            }}>
+              {flagged ? "Flagged" : "Flag for review"}
+            </button>
+          )}
+        </div>
+        <p style={{ fontSize: 11, color: "#555", marginTop: 8 }}>1-4 to select · space to confirm/advance{onFlag ? " · f to flag" : ""}</p>
       </div>
     </div>
   );
