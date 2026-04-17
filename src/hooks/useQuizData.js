@@ -6,15 +6,16 @@ export default function useQuizData() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const d = loadData();
-    setData(d);
-    setLoading(false);
+    loadData().then(d => {
+      setData(d);
+      setLoading(false);
+    });
   }, []);
 
   const persist = useCallback((updates) => {
     setData(prev => {
       const next = { ...prev, ...updates };
-      saveData(next);
+      saveData(next); // fire-and-forget async save
       return next;
     });
   }, []);

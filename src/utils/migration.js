@@ -1,10 +1,13 @@
 import { LECTURE_REGISTRY } from "../data/questions";
 
+const API_URL = '/api/quiz-data';
+
+// Legacy localStorage keys (for one-time migration to file-based storage)
 const V2_KEY = "cs50-quiz-data-v2";
 const V3_KEY = "cs50-quiz-data-v3";
 const V4_KEY = "cs50-quiz-data-v4";
 
-export { V4_KEY as STORAGE_KEY };
+const EMPTY_DATA = { schemaVersion: 4, reviewItems: [], questionHistory: {}, quizDates: [] };
 
 // Build a map: question text → question id (for v3→v4 migration)
 function buildTextToIdMap() {
@@ -43,79 +46,100 @@ function migrateV2ToV3(v2Data) {
     };
   });
 
-  return {
-    schemaVersion: 3,
-    reviewItems,
-    questionHistory: {},
-    quizDates: [],
-  };
+  return { schemaVersion: 3, reviewItems, questionHistory: {}, quizDates: [] };
 }
 
 function migrateV3ToV4(v3Data) {
   const textToId = buildTextToIdMap();
 
-  // Migrate reviewItems: questionId was question text, now it's the id
   const reviewItems = v3Data.reviewItems
     .map(r => {
       const id = textToId.get(r.questionId);
-      if (!id) return null; // question no longer exists
+      if (!id) return null;
       return { ...r, questionId: id };
     })
     .filter(Boolean);
 
-  // Migrate questionHistory: keys were question text, now they're ids
   const questionHistory = {};
   for (const [text, entry] of Object.entries(v3Data.questionHistory || {})) {
     const id = textToId.get(text);
     if (id) questionHistory[id] = entry;
   }
 
-  return {
-    schemaVersion: 4,
-    reviewItems,
-    questionHistory,
-    quizDates: v3Data.quizDates || [],
-  };
+  return { schemaVersion: 4, reviewItems, questionHistory, quizDates: v3Data.quizDates || [] };
 }
 
-export function loadData() {
+// Migrate any legacy localStorage data, save to file API, then clear localStorage
+function migrateFromLocalStorage() {
   try {
-    // Check v4 first
+    // Check v4 localStorage first
     const v4Raw = localStorage.getItem(V4_KEY);
     if (v4Raw) {
       const data = JSON.parse(v4Raw);
-      if (data.schemaVersion === 4) return data;
+      if (data.schemaVersion === 4 && (data.reviewItems.length > 0 || Object.keys(data.questionHistory).length > 0)) {
+        return data;
+      }
     }
 
-    // Check v3 and migrate
+    // Check v3
     const v3Raw = localStorage.getItem(V3_KEY);
     if (v3Raw) {
       const v3Data = JSON.parse(v3Raw);
-      const v4Data = migrateV3ToV4(v3Data.schemaVersion === 3 ? v3Data : migrateV2ToV3(v3Data));
-      localStorage.setItem(V4_KEY, JSON.stringify(v4Data));
-      return v4Data;
+      return migrateV3ToV4(v3Data.schemaVersion === 3 ? v3Data : migrateV2ToV3(v3Data));
     }
 
-    // Check v2 and migrate through v3→v4
+    // Check v2
     const v2Raw = localStorage.getItem(V2_KEY);
     if (v2Raw) {
       const v2Data = JSON.parse(v2Raw);
-      const v3Data = migrateV2ToV3(v2Data);
-      const v4Data = migrateV3ToV4(v3Data);
-      localStorage.setItem(V4_KEY, JSON.stringify(v4Data));
-      return v4Data;
+      return migrateV3ToV4(migrateV2ToV3(v2Data));
     }
   } catch (e) {
-    console.error("Migration error:", e);
+    console.error("localStorage migration error:", e);
   }
-
-  return { schemaVersion: 4, reviewItems: [], questionHistory: {}, quizDates: [] };
+  return null;
 }
 
-export function saveData(data) {
+function clearLocalStorage() {
   try {
-    localStorage.setItem(V4_KEY, JSON.stringify(data));
+    localStorage.removeItem(V2_KEY);
+    localStorage.removeItem(V3_KEY);
+    localStorage.removeItem(V4_KEY);
+  } catch (e) { /* ignore */ }
+}
+
+export async function loadData() {
+  try {
+    const res = await fetch(API_URL);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.schemaVersion === 4 && (data.reviewItems.length > 0 || Object.keys(data.questionHistory).length > 0 || data.quizDates.length > 0)) {
+        return data;
+      }
+    }
   } catch (e) {
-    console.error("Save error:", e);
+    console.error("Failed to load from API:", e);
+  }
+
+  // File was empty or missing — check localStorage for legacy data
+  const legacy = migrateFromLocalStorage();
+  if (legacy) {
+    await saveData(legacy);
+    clearLocalStorage();
+    return legacy;
+  }
+
+  return EMPTY_DATA;
+}
+
+export async function saveData(data) {
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (e) {
+    console.error("Failed to save quiz data:", e);
   }
 }
