@@ -24,7 +24,7 @@ dist-ssr
 *.sw?
 
 # Quiz progress data (personal, not committed)
-data/
+/data/
 
 # Environment
 .env

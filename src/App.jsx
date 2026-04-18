@@ -18,6 +18,7 @@ export default function App() {
   const [lastScore, setLastScore] = useState(0);
   const [lastTotal, setLastTotal] = useState(0);
   const [lastNewMisses, setLastNewMisses] = useState(0);
+  const [lastLuckyGuesses, setLastLuckyGuesses] = useState(0);
   const [isReviewQuiz, setIsReviewQuiz] = useState(false);
 
   // Resolve variant based on how many times the student has seen this question
@@ -45,14 +46,17 @@ export default function App() {
     setView("quiz");
   };
 
-  const handleFinish = (score, misses) => {
+  const handleFinish = (score, misses, luckyGuesses = []) => {
     setLastScore(score); setLastTotal(quizQs.length); setLastNewMisses(misses.length);
+    setLastLuckyGuesses(luckyGuesses.length);
 
     const now = Date.now();
     const today = new Date().toISOString().slice(0, 10);
     const missedSet = new Set(misses.map(m => m.id));
+    const luckySet = new Set(luckyGuesses.map(q => q.id));
 
     // Update question history — keyed by id
+    // Lucky guesses still count as correct (student DID answer correctly)
     const newHistory = { ...questionHistory };
     for (const q of quizQs) {
       const key = q.id;
@@ -71,6 +75,7 @@ export default function App() {
     const newDates = quizDates.includes(today) ? quizDates : [...quizDates, today];
 
     // Update review items with SM-2 — keyed by id
+    // Quality: 0 = miss, 2 = lucky guess (resets interval), 4 = confident correct
     let newReviewItems = [...reviewItems];
     const reviewMap = new Map(newReviewItems.map((r, i) => [r.questionId, i]));
 
@@ -79,7 +84,7 @@ export default function App() {
         const idx = reviewMap.get(q.id);
         if (idx === undefined) continue;
         const item = newReviewItems[idx];
-        const quality = missedSet.has(q.id) ? 0 : 4;
+        const quality = missedSet.has(q.id) ? 0 : luckySet.has(q.id) ? 2 : 4;
         const updated = calculateSM2(item, quality);
         const miss = misses.find(m => m.id === q.id);
         newReviewItems[idx] = {
@@ -92,7 +97,7 @@ export default function App() {
       // Remove graduated items
       newReviewItems = newReviewItems.filter(r => !isGraduated(r));
     } else {
-      // Normal quiz: correct answers that are in review get SM-2 update, misses get added/reset
+      // Normal quiz: misses reset, lucky guesses go to review, confident correct advances
       for (const q of quizQs) {
         const idx = reviewMap.get(q.id);
         if (missedSet.has(q.id)) {
@@ -107,8 +112,17 @@ export default function App() {
             // New miss
             newReviewItems.push(newReviewItem(q, q.source, yourAnswer));
           }
+        } else if (luckySet.has(q.id)) {
+          // Lucky guess: add to review or reset existing
+          if (idx !== undefined) {
+            const item = newReviewItems[idx];
+            const updated = calculateSM2(item, 2);
+            newReviewItems[idx] = { ...item, ...updated, lastReviewedAt: now };
+          } else {
+            newReviewItems.push(newReviewItem(q, q.source, null));
+          }
         } else if (idx !== undefined) {
-          // Correct and was in review — advance
+          // Confident correct and was in review — advance
           const item = newReviewItems[idx];
           const updated = calculateSM2(item, 4);
           newReviewItems[idx] = { ...item, ...updated, lastReviewedAt: now };
@@ -186,7 +200,7 @@ export default function App() {
       <>
         <TopBar {...topBarProps} />
         <div style={{ paddingTop: 48 }}>
-          <Results score={lastScore} total={lastTotal} newMisses={lastNewMisses} totalMisses={reviewItems.length} onNewQuiz={() => setView("pick")} onReview={() => setView("review")} />
+          <Results score={lastScore} total={lastTotal} newMisses={lastNewMisses} luckyGuesses={lastLuckyGuesses} totalMisses={reviewItems.length} onNewQuiz={() => setView("pick")} onReview={() => setView("review")} />
         </div>
       </>
     );

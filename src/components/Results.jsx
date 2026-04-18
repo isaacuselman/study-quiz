@@ -1,6 +1,6 @@
 import { DIM, GREEN, ORANGE, btn, wrap } from "../styles/theme";
 
-export default function Results({ score, total, newMisses, totalMisses, onNewQuiz, onReview }) {
+export default function Results({ score, total, newMisses, luckyGuesses = 0, totalMisses, onNewQuiz, onReview }) {
   const pct = Math.round((score / total) * 100);
   return (
     <div style={{ ...wrap, justifyContent: "center", paddingTop: 64 }}>
@@ -11,6 +11,7 @@ export default function Results({ score, total, newMisses, totalMisses, onNewQui
           {pct >= 80 ? "Solid \u2014 these fundamentals won't hold you back." : pct >= 50 ? "Decent. Review the misses before the next lecture." : "Revisit this material. Fundamentals compound."}
         </p>
         {newMisses > 0 && <p style={{ color: ORANGE, fontSize: 13, margin: "0 0 4px" }}>{newMisses} miss{newMisses !== 1 ? "es" : ""} added to spaced review</p>}
+        {luckyGuesses > 0 && <p style={{ color: "#facc15", fontSize: 13, margin: "0 0 4px" }}>{luckyGuesses} lucky guess{luckyGuesses !== 1 ? "es" : ""} added to review</p>}
         {totalMisses > 0 && <p style={{ color: DIM, fontSize: 12, margin: "0 0 24px" }}>{totalMisses} total in review queue</p>}
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={onNewQuiz} style={btn(GREEN)}>New Quiz</button>
